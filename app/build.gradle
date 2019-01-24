@@ -1,0 +1,63 @@
+apply plugin: 'com.android.application'
+
+
+repositories {
+
+    /*
+     * Add local tapkey-sdk maven repository to repositories
+     */
+    maven { url "https://maven.tapkey.com" }
+
+}
+
+android {
+    compileSdkVersion 28
+    buildToolsVersion = "28.0.3"
+    defaultConfig {
+        applicationId "net.tpky.demoapp"
+        minSdkVersion 19
+        targetSdkVersion 28
+        versionCode 1
+        versionName "1.0"
+
+        manifestPlaceholders = [auth0Domain: "", auth0Scheme: "https"]
+    }
+    compileOptions {
+        sourceCompatibility 1.8
+        targetCompatibility 1.8
+    }
+    buildTypes {
+        release {
+            minifyEnabled true
+            proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
+        }
+    }
+}
+
+
+task copyLicence(type: Copy) {
+    from '../third_party_licenses.txt'
+    into'src/main/assets/'
+}
+
+tasks.withType(JavaCompile) {
+    compileTask -> compileTask.dependsOn copyLicence
+}
+
+preBuild.dependsOn(copyLicence)
+
+dependencies {
+
+
+    /*
+     * Add Tapkey.MobileLib to dependencies
+     */
+    api 'com.tapkey.android:Tapkey.MobileLib:1.15.8.0'
+
+    implementation "com.auth0.android:auth0:1.14.1"
+
+
+    implementation fileTree(include: ['*.jar'], dir: 'libs')
+    implementation group: 'com.android.support', name: 'appcompat-v7', version: '28.0.0'
+    implementation group: 'com.android.support', name: 'design', version: '28.0.0'
+}
