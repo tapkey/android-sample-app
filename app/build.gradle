@@ -6,7 +6,13 @@ repositories {
     /*
      * Add local tapkey-sdk maven repository to repositories
      */
-    maven { url "https://maven.tapkey.com" }
+    maven {
+        url 'https://tapkey.pkgs.visualstudio.com/_packaging/Tapkey/maven/v1'
+        credentials {
+            username "AZURE_ARTIFACTS"
+            password System.getenv("AZURE_ARTIFACTS_ENV_ACCESS_TOKEN") ?: "${azureArtifactsGradleAccessToken}"
+        }
+    }
 
 }
 
