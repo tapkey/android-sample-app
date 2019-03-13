@@ -13,30 +13,33 @@
 
 package net.tpky.demoapp;
 
-import android.animation.Animator;
-import android.animation.AnimatorListenerAdapter;
-import android.annotation.TargetApi;
 import android.content.Intent;
-import android.os.Build;
+import android.net.Uri;
 import android.os.Bundle;
 import androidx.appcompat.app.AppCompatActivity;
-import android.text.TextUtils;
+import android.util.Base64;
 import android.util.Log;
 import android.view.View;
-import android.view.inputmethod.EditorInfo;
-import android.widget.AutoCompleteTextView;
-import android.widget.Button;
-import android.widget.EditText;
 
-import net.tpky.demoapp.authentication.Auth0PasswordIdentityProvider;
-import net.tpky.mc.concurrent.AsyncException;
+import net.openid.appauth.AuthorizationException;
+import net.openid.appauth.AuthorizationRequest;
+import net.openid.appauth.AuthorizationResponse;
+import net.openid.appauth.AuthorizationService;
+import net.openid.appauth.AuthorizationServiceConfiguration;
+import net.openid.appauth.ResponseTypeValues;
+import net.openid.appauth.TokenRequest;
+import net.openid.appauth.TokenResponse;
+import net.tpky.mc.AndroidTapkeyServiceFactory;
+import net.tpky.mc.auth.AuthScopeBuilder;
+import net.tpky.mc.concurrent.Async;
+import net.tpky.mc.concurrent.CancellationToken;
 import net.tpky.mc.concurrent.CancellationTokens;
-import net.tpky.mc.error.AuthenticationErrorCodes;
-import net.tpky.mc.error.TkException;
+import net.tpky.mc.concurrent.Promise;
+import net.tpky.mc.concurrent.PromiseSource;
 import net.tpky.mc.manager.NotificationManager;
 import net.tpky.mc.manager.UserManager;
-import net.tpky.mc.model.User;
-import net.tpky.mc.utils.Func1;
+
+import java.security.SecureRandom;
 
 /**
  * A login screen that offers login via email/password.
@@ -45,17 +48,18 @@ public class LoginActivity extends AppCompatActivity {
 
     private static final String TAG = LoginActivity.class.getSimpleName();
 
+    private static final int RC_AUTH = 1;
+
+
     private UserManager userManager;
-    private Auth0PasswordIdentityProvider passwordIdentityProvider;
     private NotificationManager notificationManager;
 
-    private boolean signinInProgress;
+    private AuthorizationService authService;
 
     // UI references.
-    private AutoCompleteTextView mEmailView;
-    private EditText mPasswordView;
     private View mProgressView;
-    private View mLoginFormView;
+    private String state;
+    private String verifier;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -64,173 +68,139 @@ public class LoginActivity extends AppCompatActivity {
 
         App app = (App) getApplication();
         userManager = app.getTapkeyServiceFactory().getUserManager();
-        passwordIdentityProvider = app.getPasswordIdentityProvider();
         notificationManager = app.getTapkeyServiceFactory().getNotificationManager();
-
-        // Set up the login form.
-        mEmailView = findViewById(R.id.email);
-
-        mPasswordView = findViewById(R.id.password);
-        mPasswordView.setOnEditorActionListener((textView, id, keyEvent) -> {
-            if (id == R.id.login || id == EditorInfo.IME_NULL) {
-                attemptLogin();
-                return true;
-            }
-            return false;
-        });
-
-        Button mEmailSignInButton = findViewById(R.id.email_sign_in_button);
-        mEmailSignInButton.setOnClickListener(view -> attemptLogin());
-
-        mLoginFormView = findViewById(R.id.login_form);
         mProgressView = findViewById(R.id.login_progress);
+
+        authService = new AuthorizationService(this);
+
+        startLogon();
     }
 
-    /**
-     * Attempts to sign in or register the account specified by the login form.
-     * If there are form errors (invalid email, missing fields, etc.), the
-     * errors are presented and no actual login attempt is made.
-     */
-    private void attemptLogin() {
-
-
-        if (signinInProgress) {
-            return;
-        }
-
-        // Reset errors.
-        mEmailView.setError(null);
-        mPasswordView.setError(null);
-
-        // Store values at the time of the login attempt.
-        String email = mEmailView.getText().toString();
-        String password = mPasswordView.getText().toString();
-
-        // Check for a valid email address.
-        if (TextUtils.isEmpty(email)) {
-            mEmailView.setError(getString(R.string.error_field_required));
-            mEmailView.requestFocus();
-            return;
-        }
-
-        if (!isEmailValid(email)) {
-            mEmailView.setError(getString(R.string.error_invalid_email));
-            mEmailView.requestFocus();
-            return;
-        }
-
-        // Check for a valid password, if the user entered one.
-        if (TextUtils.isEmpty(password)) {
-            mPasswordView.setError(getString(R.string.error_invalid_password));
-            mPasswordView.requestFocus();
-            return;
-        }
-
-        showProgress(true);
-
-        // as the sign in process is asynchronous, we track the info, that the process is running
-        // (will be started) now, to avoid concurrency issues.
-        signinInProgress = true;
-
-        // start the asynchronous sign in process.
-        passwordIdentityProvider.signInWithPassword(mEmailView.getText().toString(), mPasswordView.getText().toString(), CancellationTokens.None)
-
-                .continueAsyncOnUi(identity -> {
-                    // if authentication against our identity provider succeeded, provide the
-                    // identity to the Tapkey UserManager to authenticate against the Tapkey
-                    // Trust Service.
-                    return userManager.authenticateAsync(identity, CancellationTokens.None);
-                })
-
-                // when done, continue on the UI thread
-                .continueOnUi((Func1<User, Void, Exception>) user -> {
-
-                    Log.d(TAG, "Sign in was successful");
-
-                    // actively poll for notifications, so we don't have to wait for push
-                    // notifications being delivered.
-                    notificationManager.pollForNotificationsAsync()
-                            .catchOnUi(e -> {
-                                Log.e(TAG, "Couldn't poll for notifications.", e);
-                                return null;
-                            }).conclude();
-
-                    // redirect to the main activity
-                    Intent intent = new Intent(LoginActivity.this, MainActivity.class);
-                    startActivity(intent);
-                    finish();
-
-                    return null;
-                })
-
-                // Handle any exceptions on the UI thread
-                .catchOnUi(e -> {
-
-                    // If this is an AsyncException, that was raised in an async call (which is most likely here),
-                    // find out, what the original exception was.
-                    Exception syncSrcException = (e instanceof AsyncException) ? ((AsyncException) e).getSyncSrcException() : e;
-
-                    Log.e(TAG, "Sign in failed", syncSrcException);
-
-                    if (syncSrcException instanceof TkException) {
-
-                        if (AuthenticationErrorCodes.VerificationFailed.equals(((TkException) syncSrcException).getErrorCode())) {
-                            mEmailView.setError(getString(R.string.error_sign_in_failed));
-                            mPasswordView.setError(getString(R.string.error_sign_in_failed));
-                            mPasswordView.requestFocus();
-                            return null;
-                        }
-                    }
-
-                    mEmailView.setError(getString(R.string.error_sign_in_generic_error));
-                    mPasswordView.setError(getString(R.string.error_sign_in_generic_error));
-                    mEmailView.requestFocus();
-
-                    return null;
-                })
-
-                // finally - do this on the UI thread
-                .finallyOnUi(() -> {
-
-                    // mark, that the sign in process is not pending any more.
-                    signinInProgress = false;
-                    showProgress(false);
-                })
-
-                // make sure, not to miss any exceptions
-                .conclude();
+    private App getApp() {
+        return (App) getApplication();
     }
 
-    private boolean isEmailValid(String email) {
-        //TODO: Replace this with your own logic
-        return email.contains("@");
+    private void startLogon() {
+
+        CancellationToken cancellationToken = CancellationTokens.None;
+
+        String clientId = getResources().getString(R.string.oauth_client_id);
+        String serverUri = getResources().getString(R.string.oauth_authorization_server);
+
+        AuthorizationServiceConfiguration serviceConfig =
+                new AuthorizationServiceConfiguration(
+                        Uri.parse(serverUri + "/authorize"), // authorization endpoint
+                        Uri.parse(serverUri + "/token")); // token endpoint
+
+        SecureRandom rng = new SecureRandom();
+        byte[] stateBytes = new byte[32];
+        byte[] verifierBytes = new byte[32];
+        rng.nextBytes(stateBytes);
+        rng.nextBytes(verifierBytes);
+
+        state = Base64.encodeToString(stateBytes, Base64.URL_SAFE | Base64.NO_WRAP | Base64.NO_PADDING);
+        verifier = Base64.encodeToString(verifierBytes, Base64.URL_SAFE | Base64.NO_WRAP | Base64.NO_PADDING);
+
+        String scopes = new AuthScopeBuilder()
+                .withLogin()
+                .withKeyHandling()
+                .build();
+
+        AuthorizationRequest.Builder authRequestBuilder =
+                new AuthorizationRequest.Builder(
+                        serviceConfig, // the authorization service configuration
+                        clientId, // the client ID, typically pre-registered and static
+                        ResponseTypeValues.CODE, // the response_type value: we want a code
+                        Uri.parse("net.tpky.demoapp.appauth://redirect"))
+                        .setCodeVerifier(verifier)
+                        .setState(state)
+                        .setPrompt("login")
+                        .setScope(scopes)
+                ;
+
+        AuthorizationRequest authRequest = authRequestBuilder.build();
+
+        mProgressView.setVisibility(View.VISIBLE);
+        Async.firstAsync(() ->
+            executeAuthRequestAsync(authRequest)
+        ).continueAsyncOnUi(response ->
+            processAuthorizationResponse(response)
+        ).continueAsyncOnUi(tokenResponse ->
+            getApp().getoAuthFlow().authenticateAsync(tokenResponse.accessToken, tokenResponse.refreshToken, cancellationToken)
+        ).continueOnUi(userId -> {
+            if (!isFinishing())
+                finish();
+            return null;
+        }).catchOnUi(e -> {
+            Log.e(TAG, "Login failed.", e);
+            return null;
+        }).finallyOnUi(() -> {
+            mProgressView.setVisibility(View.GONE);
+        }).conclude();
     }
 
-    /**
-     * Shows the progress UI and hides the login form.
-     */
-    @TargetApi(Build.VERSION_CODES.HONEYCOMB_MR2)
-    private void showProgress(final boolean show) {
 
-        int shortAnimTime = getResources().getInteger(android.R.integer.config_shortAnimTime);
+    private PromiseSource<AuthorizationResponse> pendingAuthorizationPromiseSorce;
 
-        mLoginFormView.setVisibility(show ? View.GONE : View.VISIBLE);
-        mLoginFormView.animate().setDuration(shortAnimTime).alpha(
-                show ? 0 : 1).setListener(new AnimatorListenerAdapter() {
-            @Override
-            public void onAnimationEnd(Animator animation) {
-                mLoginFormView.setVisibility(show ? View.GONE : View.VISIBLE);
+    private Promise<AuthorizationResponse> executeAuthRequestAsync(AuthorizationRequest authRequest) {
+
+        if (pendingAuthorizationPromiseSorce != null)
+            return Async.PromiseFromException(new IllegalStateException());
+
+        Intent authIntent = authService.getAuthorizationRequestIntent(authRequest);
+        startActivityForResult(authIntent, RC_AUTH);
+
+        pendingAuthorizationPromiseSorce = new PromiseSource<>();
+        return pendingAuthorizationPromiseSorce.getPromise();
+    }
+
+    @Override
+    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+        if (requestCode == RC_AUTH) {
+
+            PromiseSource<AuthorizationResponse> pendingPromiseSource = this.pendingAuthorizationPromiseSorce;
+            if (pendingPromiseSource == null) {
+                Log.w(TAG, "Received authorization callback without pending operation.");
+                return;
             }
+
+            this.pendingAuthorizationPromiseSorce = null;
+
+            AuthorizationResponse resp = AuthorizationResponse.fromIntent(data);
+            AuthorizationException ex = AuthorizationException.fromIntent(data);
+
+            if (ex != null) {
+                pendingPromiseSource.setException(ex);
+            } else {
+                pendingPromiseSource.setResult(resp);
+            }
+        }
+    }
+
+    private Promise<TokenResponse> processAuthorizationResponse(AuthorizationResponse resp) {
+
+        PromiseSource<TokenResponse> res = new PromiseSource<>();
+
+        TokenRequest tokenRequest = resp.createTokenExchangeRequest();
+        authService.performTokenRequest(tokenRequest, (response, ex) -> {
+            if (ex != null)
+                res.setException(ex);
+            else
+                res.setResult(response);
         });
 
-        mProgressView.setVisibility(show ? View.VISIBLE : View.GONE);
-        mProgressView.animate().setDuration(shortAnimTime).alpha(
-                show ? 1 : 0).setListener(new AnimatorListenerAdapter() {
-            @Override
-            public void onAnimationEnd(Animator animation) {
-                mProgressView.setVisibility(show ? View.VISIBLE : View.GONE);
-            }
-        });
+        return res.getPromise();
+    }
+
+    @Override
+    protected void onDestroy() {
+
+        if (authService != null) {
+            authService.dispose();
+            authService = null;
+        }
+
+        super.onDestroy();
     }
 }
 

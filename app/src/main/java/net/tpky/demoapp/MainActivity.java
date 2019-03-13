@@ -19,6 +19,8 @@ import android.content.Intent;
 import android.os.Bundle;
 import androidx.annotation.NonNull;
 import com.google.android.material.navigation.NavigationView;
+
+import androidx.annotation.Nullable;
 import androidx.core.view.GravityCompat;
 import androidx.drawerlayout.widget.DrawerLayout;
 import androidx.appcompat.app.ActionBarDrawerToggle;
@@ -29,10 +31,12 @@ import android.view.MenuItem;
 import android.view.View;
 import android.widget.TextView;
 
-import net.tpky.demoapp.authentication.Auth0PasswordIdentityProvider;
 import net.tpky.mc.TapkeyServiceFactory;
+import net.tpky.mc.concurrent.Async;
+import net.tpky.mc.concurrent.CancellationToken;
 import net.tpky.mc.concurrent.CancellationTokens;
 import net.tpky.mc.manager.ConfigManager;
+import net.tpky.mc.manager.LogonManager;
 import net.tpky.mc.manager.UserManager;
 import net.tpky.mc.model.User;
 import net.tpky.mc.utils.Func1;
@@ -44,8 +48,11 @@ public class MainActivity extends AppCompatActivity
 
     private static final String TAG = MainActivity.class.getSimpleName();
 
-    private UserManager userManager;
-    private Auth0PasswordIdentityProvider passwordIdentityProvider;
+    private static final int LOGON_REQUEST_CODE = 1;
+
+
+    private TapkeyServiceFactory tapkeyServiceFactory;
+    private TextView usernameTextView;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -55,21 +62,10 @@ public class MainActivity extends AppCompatActivity
          * Retrieve the TapkeyServiceFactory singleton.
          */
         App app = (App) getApplication();
-        TapkeyServiceFactory tapkeyServiceFactory = app.getTapkeyServiceFactory();
+        this.tapkeyServiceFactory = app.getTapkeyServiceFactory();
 
         ConfigManager configManager = tapkeyServiceFactory.getConfigManager();
-        userManager = tapkeyServiceFactory.getUserManager();
-        passwordIdentityProvider = app.getPasswordIdentityProvider();
-
-        /*
-         * When no user is signed in, redirect to login LoginActivity
-         */
-        if(!userManager.hasUsers()){
-            Intent intent = new Intent(this, LoginActivity.class);
-            startActivity(intent);
-            finish();
-            return;
-        }
+        UserManager userManager = tapkeyServiceFactory.getUserManager();
 
         setContentView(R.layout.activity_main);
         Toolbar toolbar = (Toolbar) findViewById(R.id.toolbar);
@@ -85,7 +81,25 @@ public class MainActivity extends AppCompatActivity
         navigationView.setNavigationItemSelectedListener(this);
 
         View headerView = navigationView.getHeaderView(0);
-        TextView usernameTextView = (TextView) headerView.findViewById(R.id.nav_header__username);
+        this.usernameTextView = (TextView) headerView.findViewById(R.id.nav_header__username);
+
+        /*
+         * When no user is signed in, redirect to login LoginActivity
+         */
+        if(!userManager.hasUsers()){
+            Intent intent = new Intent(this, LoginActivity.class);
+            startActivityForResult(intent, LOGON_REQUEST_CODE);
+            return;
+        }
+
+        refresh();
+        checkAppState(configManager);
+
+    }
+
+    private void refresh() {
+
+        UserManager userManager = tapkeyServiceFactory.getUserManager();
 
         /*
          * Get the username of first user and display it in side menu. The first user is used here,
@@ -95,7 +109,9 @@ public class MainActivity extends AppCompatActivity
         if(firstUser != null){
             usernameTextView.setText(firstUser.getIpUserName());
         }
+    }
 
+    private void checkAppState(ConfigManager configManager) {
         /*
          * Verify, that app is compatible
          */
@@ -207,20 +223,34 @@ public class MainActivity extends AppCompatActivity
          * To sign out user, get all users and call {@link net.tpky.mc.manager.UserManager#logOff(User)}}
          * for each
          */
+        LogonManager logonManager = tapkeyServiceFactory.getLogonManager();
+        UserManager userManager = tapkeyServiceFactory.getUserManager();
 
         List<User> users = userManager.getUsers();
 
+        CancellationToken ct = CancellationTokens.None;
+
         for(User user : users){
-            userManager.logOff(user, CancellationTokens.None);
-            passwordIdentityProvider.logOutAsync(user, CancellationTokens.None);
+            Async.firstAsync(() ->
+                logonManager.signOutAsync(user.getId(), ct)
+            ).catchOnUi(e -> {
+                Log.e(TAG, "Couldn't sign user '" + user.getId() + "' out.", e);
+                return null;
+            }).conclude();
         }
 
         /*
          * Redirect to LoginActivity
          */
         Intent intent = new Intent(this, LoginActivity.class);
-        startActivity(intent);
+        startActivityForResult(intent, LOGON_REQUEST_CODE);
+    }
 
-        finish();
+    @Override
+    protected void onActivityResult(int requestCode, int resultCode, @Nullable Intent data) {
+
+        refresh();
+
+        super.onActivityResult(requestCode, resultCode, data);
     }
 }

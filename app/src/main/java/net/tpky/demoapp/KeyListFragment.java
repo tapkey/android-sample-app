@@ -150,8 +150,12 @@ public class KeyListFragment extends ListFragment {
         }
 
         if (ContextCompat.checkSelfPermission(getContext(), android.Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED) {
-            // If we have the COARSE_LOCATION permission, start scanning for BLE devices
-            bleLockManager.startForegroundScan();
+            try {
+                // If we have the COARSE_LOCATION permission, start scanning for BLE devices
+                bleLockManager.startForegroundScan();
+            } catch (Exception e) {
+                Log.i(TAG, "Couldn't start scanning for BLE locks nearby.", e);
+            }
         }else{
             if (shouldShowRequestPermissionRationale(android.Manifest.permission.ACCESS_COARSE_LOCATION)) {
                 showPermissionRationale();

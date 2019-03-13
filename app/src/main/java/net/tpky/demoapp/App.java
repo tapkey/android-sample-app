@@ -15,18 +15,14 @@ package net.tpky.demoapp;
 
 import android.app.Application;
 
-import net.tpky.demoapp.authentication.Auth0PasswordIdentityProvider;
 import net.tpky.mc.AndroidTapkeyServiceFactory;
 import net.tpky.mc.TapkeyAppContext;
 import net.tpky.mc.TapkeyServiceFactoryBuilder;
+import net.tpky.mc.auth.OAuthRefreshableFlow;
 import net.tpky.mc.broadcast.PushNotificationReceiver;
 import net.tpky.mc.concurrent.AsyncSchedulerUtils;
 import net.tpky.mc.concurrent.AsyncSchedulers;
 import net.tpky.mc.concurrent.AsyncStackTrace;
-
-import java.net.CookieHandler;
-import java.net.CookieManager;
-import java.net.CookiePolicy;
 
 /*
  * Tapkey expects the Application instance to implement the TapkeyAppContext interface.
@@ -55,8 +51,7 @@ public class App extends Application implements TapkeyAppContext{
      * The TapkeyServiceFactory holds all needed services
      */
     private AndroidTapkeyServiceFactory tapkeyServiceFactory;
-
-    private Auth0PasswordIdentityProvider passwordIdentityProvider;
+    private OAuthRefreshableFlow oAuthFlow;
 
     @Override
     public void onCreate() {
@@ -85,22 +80,18 @@ public class App extends Application implements TapkeyAppContext{
                 //.setSSLContext(SSLContext.getDefault())
         ;
 
-
         // build the TapkeyServiceFactory instance.
         this.tapkeyServiceFactory = b.build(this);
 
-        // Create an identity provider and register it with the Tapkey libraries.
-        passwordIdentityProvider = new Auth0PasswordIdentityProvider(tapkeyServiceFactory.getConfigManager(), tapkeyServiceFactory.getDataContext());
-        this.tapkeyServiceFactory.getIdentityProviderRegistration().registerIdentityProvider(Auth0PasswordIdentityProvider.IP_ID, passwordIdentityProvider);
+        try {
+            String clientId = getResources().getString(R.string.oauth_client_id);
+            String serverUri = getResources().getString(R.string.oauth_authorization_server);
+            this.oAuthFlow = new OAuthRefreshableFlow(tapkeyServiceFactory.getRestExecutor(), serverUri, clientId);
+            this.oAuthFlow.link(tapkeyServiceFactory.getLogonManager());
 
-
-        /*
-         * The Tapkey libs require cookies to be persisted in order to survive app/device restarts
-         * because server authentication involves authentication cookies.
-         * Persistence is done using the cookie store provided by the TapkeyServiceFactory instance.
-         */
-        CookieHandler.setDefault(new CookieManager(tapkeyServiceFactory.getCookieStore(), CookiePolicy.ACCEPT_ORIGINAL_SERVER));
-
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
 
         /*
          * Register PushNotificationReceiver
@@ -121,7 +112,7 @@ public class App extends Application implements TapkeyAppContext{
         return tapkeyServiceFactory;
     }
 
-    public Auth0PasswordIdentityProvider getPasswordIdentityProvider() {
-        return passwordIdentityProvider;
+    public OAuthRefreshableFlow getoAuthFlow() {
+        return oAuthFlow;
     }
 }
