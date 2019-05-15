@@ -26,6 +26,7 @@ import android.widget.ArrayAdapter;
 import android.widget.Toast;
 
 import net.tpky.mc.TapkeyServiceFactory;
+import net.tpky.mc.concurrent.CancellationToken;
 import net.tpky.mc.concurrent.CancellationTokens;
 import net.tpky.mc.concurrent.Promise;
 import net.tpky.mc.manager.BleLockManager;
@@ -67,7 +68,7 @@ public class KeyListFragment extends ListFragment {
         }
 
         @Override
-        public Promise<Boolean> triggerLock(String physicalLockId) {
+        public Promise<Boolean> triggerLock(String physicalLockId, CancellationToken ct) {
 
             // let the BLE lock manager establish a connection to the BLE lock and then let the
             // CommandExecutionFacade use this connection to execute a TriggerLock command.
@@ -75,9 +76,9 @@ public class KeyListFragment extends ListFragment {
 
                 // now, that we have a TlcpConnection to the lock, let the CommandExecutionFacade
                 // asynchronously execute the trigger lock command.
-                return commandExecutionFacade.triggerLockAsync(tlcpConnection, CancellationTokens.None);
+                return commandExecutionFacade.triggerLockAsync(tlcpConnection, ct);
 
-            }, CancellationTokens.None).continueOnUi(commandResult -> {
+            }, ct).continueOnUi(commandResult -> {
 
                 switch (commandResult.getCommandResultCode()) {
                     case Ok:
@@ -96,8 +97,10 @@ public class KeyListFragment extends ListFragment {
 
                 Log.e(TAG, "Couldn't execute trigger lock command.", e);
 
-                // handle any exceptions and let the user know, something went wrong.
-                Toast.makeText(getContext(), R.string.key_item__triger_failed, Toast.LENGTH_SHORT).show();
+                if (!ct.isCancellationRequested()) {
+                    // handle any exceptions and let the user know, something went wrong.
+                    Toast.makeText(getContext(), R.string.key_item__triger_failed, Toast.LENGTH_SHORT).show();
+                }
                 return false;
 
             });

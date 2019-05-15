@@ -26,6 +26,9 @@ import android.widget.ArrayAdapter;
 import android.widget.TextView;
 
 import net.tpky.mc.concurrent.Async;
+import net.tpky.mc.concurrent.CancellationToken;
+import net.tpky.mc.concurrent.CancellationTokenSource;
+import net.tpky.mc.concurrent.CancellationUtils;
 import net.tpky.mc.concurrent.Promise;
 import net.tpky.mc.model.webview.CachedKeyInformation;
 import net.tpky.mc.utils.Func1;
@@ -39,7 +42,7 @@ public class KeyItemAdapter extends ArrayAdapter<CachedKeyInformation> {
 
     public interface KeyItemAdapterHandler {
         boolean isLockNearby(String physicalLockId);
-        Promise<Boolean> triggerLock(String physicalLockId);
+        Promise<Boolean> triggerLock(String physicalLockId, CancellationToken ct);
     }
 
     private final KeyItemAdapterHandler handler;
@@ -64,6 +67,7 @@ public class KeyItemAdapter extends ArrayAdapter<CachedKeyInformation> {
         TextView validBeforeTextView = (TextView) viewToUse.findViewById(R.id.key_item__valid_before);
         View validFromWrapper = viewToUse.findViewById(R.id.key_item__valid_from_wrapper);
         final AppCompatButton triggerButton = (AppCompatButton) viewToUse.findViewById(R.id.key_item__trigger_button);
+        final AppCompatButton cancelButton = (AppCompatButton) viewToUse.findViewById(R.id.key_item__cancel_trigger_button);
 
         lockNameTextView.setText(getTitle(item));
         ownerNameTextView.setText(getOwnerName(item));
@@ -98,16 +102,27 @@ public class KeyItemAdapter extends ArrayAdapter<CachedKeyInformation> {
         if(!handler.isLockNearby(physicalLockId)){
 
             triggerButton.setVisibility(View.GONE);
+            cancelButton.setVisibility(View.GONE);
             triggerButton.setOnClickListener(null);
 
         }else{
 
             triggerButton.setOnClickListener(view -> {
 
+                CancellationTokenSource cts = new CancellationTokenSource();
+
                 triggerButton.setEnabled(false);
+                triggerButton.setVisibility(View.GONE);
+                cancelButton.setVisibility(View.VISIBLE);
+                cancelButton.setEnabled(true);
+
+                cancelButton.setOnClickListener(ignore -> {
+                    cts.requestCancellation();
+                    cancelButton.setEnabled(false);
+                });
 
                 // asynchronously trigger an unlock command
-                handler.triggerLock(physicalLockId)
+                handler.triggerLock(physicalLockId, CancellationUtils.withTimeout(cts.getToken(), 15000))
 
                         // Catch errors and return false to indicate failure
                         .catchOnUi(e -> {
@@ -120,10 +135,12 @@ public class KeyItemAdapter extends ArrayAdapter<CachedKeyInformation> {
 
                             // when trigger lock was successfully set background color to green
                             // otherwise set background color to red
-                            viewToUse.setBackgroundColor((success) ? Color.GREEN : Color.RED);
+                            viewToUse.setBackgroundColor((success) ? Color.GREEN : cts.getToken().isCancellationRequested()? Color.TRANSPARENT: Color.RED);
 
                             // enable button to allow another trigger
                             triggerButton.setEnabled(true);
+                            triggerButton.setVisibility(View.VISIBLE);
+                            cancelButton.setVisibility(View.GONE);
 
                             // reset background after a delay
                             Async.delayAsync(3000).continueOnUi((Func1<Void, Void, Exception>) aVoid -> {
@@ -139,6 +156,8 @@ public class KeyItemAdapter extends ArrayAdapter<CachedKeyInformation> {
             });
 
             triggerButton.setVisibility(View.VISIBLE);
+            triggerButton.setEnabled(true);
+            cancelButton.setVisibility(View.GONE);
         }
 
 

@@ -23,6 +23,7 @@
     <string name="key_item__unknown_owner">Unknown Owner</string>
     <string name="key_item__unrestricted_access">Unrestricted Access</string>
     <string name="key_item__trigger_button_text">Lock/Unlock</string>
+    <string name="key_item__cancel_trigger_button_text">Cancel</string>
     <string name="key_item__valid_before">Valid until:</string>
     <string name="key_item__valid_from">Valid From:</string>
     <string name="key_item__issued_by">Issued by:</string>
