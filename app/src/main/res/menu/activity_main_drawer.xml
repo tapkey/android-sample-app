@@ -7,6 +7,11 @@
         android:title="@string/sign_out"/>
 
     <item
+        android:id="@+id/nav__refresh"
+        android:icon="@android:drawable/ic_menu_rotate"
+        android:title="@string/refresh"/>
+
+    <item
         android:id="@+id/nav__about"
         android:icon="@android:drawable/ic_menu_help"
         android:title="@string/about"/>

@@ -92,12 +92,12 @@ public class MainActivity extends AppCompatActivity
             return;
         }
 
-        refresh();
+        refreshUi();
         checkAppState(configManager);
 
     }
 
-    private void refresh() {
+    private void refreshUi() {
 
         UserManager userManager = tapkeyServiceFactory.getUserManager();
 
@@ -202,6 +202,10 @@ public class MainActivity extends AppCompatActivity
                 signOut();
                 break;
 
+            case R.id.nav__refresh:
+                refreshKeys();
+                break;
+
             case R.id.nav__about:
                 Intent intent = new Intent(this, AboutActivity.class);
                 startActivity(intent);
@@ -211,6 +215,18 @@ public class MainActivity extends AppCompatActivity
         DrawerLayout drawer = (DrawerLayout) findViewById(R.id.drawer_layout);
         drawer.closeDrawer(GravityCompat.START);
         return true;
+    }
+
+    private void refreshKeys() {
+
+        Async.firstAsync(() ->
+            tapkeyServiceFactory.getNotificationManager().pollForNotificationsAsync()
+        ).catchOnUi(e -> {
+            Log.e(TAG, "Error while polling for notifications.", e);
+            return null;
+        }).finallyOnUi(() ->
+                Log.i(TAG, "Polling for notifications completed.")
+        ).conclude();
     }
 
 
@@ -249,7 +265,7 @@ public class MainActivity extends AppCompatActivity
     @Override
     protected void onActivityResult(int requestCode, int resultCode, @Nullable Intent data) {
 
-        refresh();
+        refreshUi();
 
         super.onActivityResult(requestCode, resultCode, data);
     }

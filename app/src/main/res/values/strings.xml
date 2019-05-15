@@ -34,4 +34,5 @@
     <string name="app_too_old_button">Ok</string>
     <string name="newer_app_available">There is a newer version of thie app available. Please update.</string>
     <string name="newer_app_available_button">Ok</string>
+    <string name="refresh">Refresh</string>
 </resources>
