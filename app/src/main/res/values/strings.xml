@@ -2,38 +2,28 @@
     <string name="app_name">Tapkey SDK Sample</string>
 
     <!-- Strings related to login -->
-    <string name="prompt_email">Email</string>
-    <string name="prompt_password">Password</string>
-    <string name="action_sign_in">Sign in</string>
-    <string name="action_sign_in_short">Sign in</string>
-    <string name="error_invalid_email">This email address is invalid</string>
-    <string name="error_invalid_password">This password is too short</string>
-    <string name="error_incorrect_password">This password is incorrect</string>
-    <string name="error_field_required">This field is required</string>
-    <string name="error_sign_in_failed">Email adress or password wrong</string>
-    <string name="error_sign_in_generic_error">Oops, something went wrong</string>
+    <string name="hint_email">E-mail</string>
+    <string name="hint_password">Password</string>
 
     <string name="navigation_drawer_open">Open navigation drawer</string>
     <string name="navigation_drawer_close">Close navigation drawer</string>
 
-    <string name="action_settings">Settings</string>
     <string name="sign_out">Sign Out</string>
     <string name="about">About</string>
     <string name="key_item__unknown_lock">Unknown Lock</string>
     <string name="key_item__unknown_owner">Unknown Owner</string>
-    <string name="key_item__unrestricted_access">Unrestricted Access</string>
-    <string name="key_item__trigger_button_text">Lock/Unlock</string>
+    <string name="key_item__trigger_button_text">Trigger</string>
     <string name="key_item__cancel_trigger_button_text">Cancel</string>
-    <string name="key_item__valid_before">Valid until:</string>
-    <string name="key_item__valid_from">Valid From:</string>
-    <string name="key_item__issued_by">Issued by:</string>
+    <string name="key_item__access_restricted">Restricted access</string>
+    <string name="key_item__access_unrestricted">Unrestricted access</string>
+    <string name="key_item__issued_by">Issued by %1$s</string>
     <string name="key_item__permission_needed">Permission Coarse location needed</string>
-    <string name="key_item__triger_failed">Oops, something went wrong.</string>
-    <string name="bluetooth_and_location_inf_header">Bluetooth and Location</string>
-    <string name="bluetooth_and_location_inf_message">Please make sure, bluetooth and location are enabled.</string>
-    <string name="main_app_too_old">This version of the app is not supported anymore. Please update.</string>
-    <string name="app_too_old_button">Ok</string>
-    <string name="newer_app_available">There is a newer version of thie app available. Please update.</string>
-    <string name="newer_app_available_button">Ok</string>
+    <string name="key_item__trigger_lock_failed">Something went wrong.</string>
+    <string name="bluetooth_and_location_inf_header">Bluetooth and location</string>
+    <string name="bluetooth_and_location_inf_message">Bluetooth and location must be enabled.</string>
     <string name="refresh">Refresh</string>
+    <string name="hint_first_name">First name</string>
+    <string name="hint_last_name">Last name</string>
+    <string name="create_new_account">Create new account</string>
+    <string name="create_account">Create account</string>
 </resources>
