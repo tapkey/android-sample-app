@@ -1,0 +1,83 @@
+resources:
+  - repo: self
+queue:
+  name: Hosted VS2017
+  demands:
+    - java
+    - JDK
+    - AndroidSDK
+steps:
+  - powershell: |
+      mkdir -p ~/.gradle/
+      Add-Content -Path ~/.gradle/gradle.properties -Value "azureArtifactsGradleAccessToken=$(System.AccessToken)"
+    displayName: 'Add access token for internal maven repo'
+
+  - powershell: |
+
+      function Set-Env {
+          param( [string]$Name, [string]$Value )
+          Write-Host "##vso[task.setvariable variable=$Name;]$Value"
+          Write-Host "##vso[task.setvariable variable=$Name;isOutput=true]$Value"
+      }
+
+      $gradlePath = "app/build.gradle"
+      $versionName = Select-String -path "$gradlePath" "^\s*versionName\s*`"(.*)`"\s*$" -AllMatches | Foreach-Object {$_.Matches} | Foreach-Object {$_.Groups[1].Value}
+      $versionCode = Select-String -path "$gradlePath" "^\s*versionCode\s*(.*)\s*$" -AllMatches | Foreach-Object {$_.Matches} | Foreach-Object {$_.Groups[1].Value}
+      $buildTime      = (Get-Date).ToUniversalTime().ToString("yyyyMMdd-HHmm")
+      $buildGUID      = [string][guid]::NewGuid()
+      $buildGUIDShort = $buildGUID.split('-')[0]
+      $buildString = "$($buildTime)_$($versionCode)_$buildGUIDShort"
+      Write-Host "##vso[build.updatebuildnumber]$buildString"
+
+      Write-Host "VersionName: $versionName"
+      Write-Host "versionCode: $versionCode"
+      Set-Env "BUILD_GUID" $buildGUID
+      Set-Env "BUILD_GUID_SHORT" $buildGUIDShort
+
+      Set-Env "VERSION_NAME" $versionName
+      Set-Env "VERSION_CODE" $versionCode
+      Set-Env "BUILD_STRING" $buildString
+      Set-Env "BUILD_TIME" $buildTime
+    displayName: 'Read Version infos'
+
+  - task: Gradle@2
+    displayName: 'gradlew app:assembleRelease'
+    inputs:
+      tasks: 'app:assembleRelease'
+
+      publishJUnitResults: false
+
+
+  - task: AndroidSigning@3
+    displayName: 'Sign apk'
+    inputs:
+      apkFiles: 'app/build/outputs/apk/release/app-release-unsigned.apk'
+
+      apksignerKeystoreFile: 'ede94807-c5a9-4ab3-8abc-6c270dc1c28f'
+
+      apksignerKeystorePassword: '$(APK_SIGNING_KEYSTORE_PW)'
+
+      apksignerKeystoreAlias: '$(APK_SIGNING_KEYSTORE_ALIAS)'
+
+      apksignerKeyPassword: '$(APK_SIGNING_KEYSTORE_ALIAS_PW)'
+
+
+  - script: 'mv app/build/outputs/apk/release/app-release-unsigned.apk $(Build.ArtifactStagingDirectory)/$(BUILD_STRING).SampleApp.apk'
+    displayName: 'stage apk'
+
+  - task: ArchiveFiles@2
+    displayName: 'Archive obfuscation mapping'
+    inputs:
+      rootFolderOrFile: app/build/outputs/mapping/release/mapping.txt
+
+      includeRootFolder: false
+
+      archiveType: 7z
+
+      archiveFile: '$(Build.ArtifactStagingDirectory)/$(BUILD_STRING).SampleApp.mapping.7z'
+
+
+  - task: PublishBuildArtifacts@1
+    displayName: 'Publish Artifact'
+    inputs:
+      ArtifactName: '$(BUILD_STRING)'

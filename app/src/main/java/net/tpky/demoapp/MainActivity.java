@@ -1,51 +1,36 @@
-/* /////////////////////////////////////////////////////////////////////////////////////////////////
-//                          Copyright (c) Tapkey GmbH
-//
-//         All rights are reserved. Reproduction in whole or in part is
-//        prohibited without the written consent of the copyright owner.
-//    Tapkey reserves the right to make changes without notice at any time.
-//   Tapkey makes no warranty, expressed, implied or statutory, including but
-//   not limited to any implied warranty of merchantability or fitness for any
-//  particular purpose, or that the use will not infringe any third party patent,
-//   copyright or trademark. Tapkey must not be liable for any loss or damage
-//                            arising from its use.
-///////////////////////////////////////////////////////////////////////////////////////////////// */
-
 package net.tpky.demoapp;
 
-import android.app.AlertDialog;
-import android.content.DialogInterface;
 import android.content.Intent;
 import android.os.Bundle;
-import androidx.annotation.NonNull;
-import com.google.android.material.navigation.NavigationView;
-import androidx.core.view.GravityCompat;
-import androidx.drawerlayout.widget.DrawerLayout;
-import androidx.appcompat.app.ActionBarDrawerToggle;
-import androidx.appcompat.app.AppCompatActivity;
-import androidx.appcompat.widget.Toolbar;
 import android.util.Log;
 import android.view.MenuItem;
 import android.view.View;
 import android.widget.TextView;
 
-import net.tpky.demoapp.authentication.Auth0PasswordIdentityProvider;
-import net.tpky.mc.TapkeyServiceFactory;
-import net.tpky.mc.concurrent.CancellationTokens;
-import net.tpky.mc.manager.ConfigManager;
-import net.tpky.mc.manager.UserManager;
-import net.tpky.mc.model.User;
-import net.tpky.mc.utils.Func1;
+import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
+import androidx.core.view.GravityCompat;
+import androidx.drawerlayout.widget.DrawerLayout;
+import androidx.appcompat.app.ActionBarDrawerToggle;
+import androidx.appcompat.app.AppCompatActivity;
+import androidx.appcompat.widget.Toolbar;
 
-import java.util.List;
+import com.google.android.material.navigation.NavigationView;
+import com.tapkey.mobile.TapkeyServiceFactory;
+import com.tapkey.mobile.concurrent.Async;
+import com.tapkey.mobile.concurrent.CancellationTokens;
+import com.tapkey.mobile.manager.UserManager;
 
 public class MainActivity extends AppCompatActivity
         implements NavigationView.OnNavigationItemSelectedListener {
 
     private static final String TAG = MainActivity.class.getSimpleName();
 
-    private UserManager userManager;
-    private Auth0PasswordIdentityProvider passwordIdentityProvider;
+    private static final int LOGON_REQUEST_CODE = 1;
+
+
+    private TapkeyServiceFactory tapkeyServiceFactory;
+    private TextView usernameTextView;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -55,21 +40,9 @@ public class MainActivity extends AppCompatActivity
          * Retrieve the TapkeyServiceFactory singleton.
          */
         App app = (App) getApplication();
-        TapkeyServiceFactory tapkeyServiceFactory = app.getTapkeyServiceFactory();
+        this.tapkeyServiceFactory = app.getTapkeyServiceFactory();
 
-        ConfigManager configManager = tapkeyServiceFactory.getConfigManager();
-        userManager = tapkeyServiceFactory.getUserManager();
-        passwordIdentityProvider = app.getPasswordIdentityProvider();
-
-        /*
-         * When no user is signed in, redirect to login LoginActivity
-         */
-        if(!userManager.hasUsers()){
-            Intent intent = new Intent(this, LoginActivity.class);
-            startActivity(intent);
-            finish();
-            return;
-        }
+        UserManager userManager = tapkeyServiceFactory.getUserManager();
 
         setContentView(R.layout.activity_main);
         Toolbar toolbar = (Toolbar) findViewById(R.id.toolbar);
@@ -85,87 +58,49 @@ public class MainActivity extends AppCompatActivity
         navigationView.setNavigationItemSelectedListener(this);
 
         View headerView = navigationView.getHeaderView(0);
-        TextView usernameTextView = (TextView) headerView.findViewById(R.id.nav_header__username);
+        this.usernameTextView = (TextView) headerView.findViewById(R.id.nav_header__username);
 
         /*
-         * Get the username of first user and display it in side menu. The first user is used here,
-         * because we don't support multi-user yet anyways.
+         * Redirect to LoginActivity if not authorized.
          */
-        User firstUser = userManager.getFirstUser();
-        if(firstUser != null){
-            usernameTextView.setText(firstUser.getIpUserName());
+        if (!AuthStateManager.isLoggedIn(this)) {
+            Log.d(TAG, "Not authorized. Redirecting to LoginActivity.");
+            Intent intent = new Intent(this, LoginActivity.class);
+            startActivityForResult(intent, LOGON_REQUEST_CODE);
         }
-
         /*
-         * Verify, that app is compatible
+         * Check for Tapkey SDK login status.
          */
-        configManager.getAppState(CancellationTokens.None)
+        else if (userManager.getUsers().isEmpty()) {
+            Log.d(TAG, "Tapkey SDK: No user is logged in. Attempting to log in again.");
 
-                // asynchronously receive the operation result on the UI thread
-                .continueOnUi((Func1<ConfigManager.AppState, Void, Exception>) appState -> {
+            /*
+             * In a real application, the implementor may want to try to re-authenticate
+             * the user gracefully. In this sample app, the entire authentication
+             * information is deleted and the user is redirected to the login page.
+             */
+            AuthStateManager.setLoggedOut(this);
+            Intent intent = new Intent(this, LoginActivity.class);
+            startActivityForResult(intent, LOGON_REQUEST_CODE);
+        } else {
+            refreshUi();
+        }
+    }
 
-                    // some time might have passed and maybe the activity is already finishing.
-                    if (isFinishing())
-                        return null;
+    private void refreshUi() {
 
+        UserManager userManager = tapkeyServiceFactory.getUserManager();
 
-                    switch (appState) {
-
-                        // SDK Version is not supported anymore
-                        case CLIENT_TOO_OLD:
-
-                            new AlertDialog.Builder(MainActivity.this)
-                                    .setMessage(R.string.main_app_too_old)
-                                    .setPositiveButton(R.string.app_too_old_button, new DialogInterface.OnClickListener() {
-                                        public void onClick(DialogInterface dialog, int id) {
-                                            finish();
-                                        }
-                                    })
-                                    .setOnDismissListener(dialogInterface -> {
-
-                                        // TODO: Redirect to the app store, to let the user
-                                        // download the latest app version.
-
-                                        finish();
-                                    })
-                                    .create()
-                                    .show();
-
-                            break;
-
-                        // This version of the SDK is still supported but is short before expiring and should be updated.
-                        case CLIENT_UPDATE_SUGGESTED:
-
-                            new AlertDialog.Builder(MainActivity.this)
-                                    .setMessage(R.string.newer_app_available)
-                                    .setPositiveButton(R.string.newer_app_available_button, null)
-                                    .create()
-                                    .show();
-
-                            break;
-
-                        case CLIENT_VERSION_OK:
-                        default:
-                    }
-
-                    return null;
-                })
-
-                // Handle exceptions raised in async code.
-                .catchOnUi(e -> {
-
-                    // Handle error
-                    Log.e(TAG, "failed to fetch app state: ", e);
-                    return null;
-                })
-
-                // Make sure, no exceptions get lost.
-                .conclude();
+        // TODO handle more than one users
+        String firstUser = userManager.getUsers().get(0);
+        if (firstUser != null) {
+            usernameTextView.setText(firstUser); // TODO query for user's details
+        }
     }
 
     @Override
     public void onBackPressed() {
-        DrawerLayout drawer = (DrawerLayout) findViewById(R.id.drawer_layout);
+        DrawerLayout drawer = findViewById(R.id.drawer_layout);
         if (drawer.isDrawerOpen(GravityCompat.START)) {
             drawer.closeDrawer(GravityCompat.START);
         } else {
@@ -180,10 +115,14 @@ public class MainActivity extends AppCompatActivity
         // Handle navigation view item clicks here.
         int id = item.getItemId();
 
-        switch (id){
+        switch (id) {
 
             case R.id.nav__sign_out:
-                signOut();
+                logOut();
+                break;
+
+            case R.id.nav__refresh:
+                refreshKeys();
                 break;
 
             case R.id.nav__about:
@@ -197,30 +136,48 @@ public class MainActivity extends AppCompatActivity
         return true;
     }
 
+    private void refreshKeys() {
+
+        Async.firstAsync(() ->
+                tapkeyServiceFactory.getNotificationManager().pollForNotificationsAsync(CancellationTokens.None)
+        ).catchOnUi(e -> {
+            Log.e(TAG, "Error while polling for notifications.", e);
+            return null;
+        }).finallyOnUi(() ->
+                Log.i(TAG, "Polling for notifications completed.")
+        ).conclude();
+    }
 
     /*
      * Sign out user
      */
-    private void signOut(){
+    private void logOut() {
+        UserManager userManager = tapkeyServiceFactory.getUserManager();
 
-        /**
-         * To sign out user, get all users and call {@link net.tpky.mc.manager.UserManager#logOff(User)}}
-         * for each
-         */
+        // Tapkey SDK logout
+        if (!userManager.getUsers().isEmpty()) {
+            String userId = userManager.getUsers().get(0);
 
-        List<User> users = userManager.getUsers();
-
-        for(User user : users){
-            userManager.logOff(user, CancellationTokens.None);
-            passwordIdentityProvider.logOutAsync(user, CancellationTokens.None);
+            Async.firstAsync(() ->
+                    userManager.logOutAsync(userId, CancellationTokens.None)
+            ).catchOnUi(e -> {
+                Log.e(TAG, "Could not log out user: " + userId, e);
+                return null;
+            }).conclude();
         }
+
+        AuthStateManager.setLoggedOut(this);
 
         /*
          * Redirect to LoginActivity
          */
         Intent intent = new Intent(this, LoginActivity.class);
-        startActivity(intent);
+        startActivityForResult(intent, LOGON_REQUEST_CODE);
+    }
 
-        finish();
+    @Override
+    protected void onActivityResult(int requestCode, int resultCode, @Nullable Intent data) {
+        refreshUi();
+        super.onActivityResult(requestCode, resultCode, data);
     }
 }

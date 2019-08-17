@@ -1,13 +1,14 @@
 apply plugin: 'com.android.application'
+apply plugin: 'idea'
 
+idea {
+    module {
+        downloadJavadoc = true
+    }
+}
 
 repositories {
-
-    /*
-     * Add local tapkey-sdk maven repository to repositories
-     */
     maven { url "https://maven.tapkey.com" }
-
 }
 
 android {
@@ -19,8 +20,10 @@ android {
         targetSdkVersion 28
         versionCode 1
         versionName "1.0"
-
-        manifestPlaceholders = [auth0Domain: "", auth0Scheme: "https"]
+        vectorDrawables {
+            useSupportLibrary = true
+        }
+        manifestPlaceholders = [auth0Domain: "", auth0Scheme: "https", 'appAuthRedirectScheme': 'net.tpky.demoapp.appauth']
     }
     compileOptions {
         sourceCompatibility 1.8
@@ -34,7 +37,6 @@ android {
     }
 }
 
-
 task copyLicence(type: Copy) {
     from '../third_party_licenses.txt'
     into'src/main/assets/'
@@ -47,17 +49,14 @@ tasks.withType(JavaCompile) {
 preBuild.dependsOn(copyLicence)
 
 dependencies {
-
-
     /*
      * Add Tapkey.MobileLib to dependencies
      */
-    api 'com.tapkey.android:Tapkey.MobileLib:1.15.12.0'
-
-    implementation "com.auth0.android:auth0:1.14.1"
-
+    api 'com.tapkey.android:Tapkey.MobileLib:2.1.0.0-preview'
 
     implementation fileTree(include: ['*.jar'], dir: 'libs')
     implementation group: 'androidx.appcompat', name: 'appcompat', version: '1.0.2'
-    implementation group: 'com.google.android.material', name: 'material', version: '1.0.0'
+    implementation 'com.google.android.material:material:1.1.0-alpha09'
+    implementation 'com.android.volley:volley:1.1.1'
+    implementation 'net.openid:appauth:0.7.1'
 }

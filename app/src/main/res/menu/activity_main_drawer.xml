@@ -2,13 +2,17 @@
 <menu xmlns:android="http://schemas.android.com/apk/res/android">
 
     <item
-        android:id="@+id/nav__sign_out"
-        android:icon="@android:drawable/ic_delete"
-        android:title="@string/sign_out"/>
+        android:id="@+id/nav__refresh"
+        android:icon="@drawable/ic_autorenew_black_24dp"
+        android:title="@string/refresh" />
 
     <item
+        android:id="@+id/nav__sign_out"
+        android:icon="@drawable/ic_subdirectory_arrow_left_black_24dp"
+        android:title="@string/sign_out" />
+    <item
         android:id="@+id/nav__about"
-        android:icon="@android:drawable/ic_menu_help"
-        android:title="@string/about"/>
+        android:icon="@drawable/ic_info_outline_black_24dp"
+        android:title="@string/about" />
 
 </menu>
