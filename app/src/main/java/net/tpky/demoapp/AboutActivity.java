@@ -12,6 +12,7 @@ import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.util.Locale;
 
 public class AboutActivity extends AppCompatActivity {
 
@@ -29,7 +30,7 @@ public class AboutActivity extends AppCompatActivity {
         TextView appVersionCode = findViewById(R.id.about__app_version_code);
 
         appVersionName.setText(versionName);
-        appVersionCode.setText(Integer.toString(versionCode));
+        appVersionCode.setText(String.format(Locale.US, "%1$d", versionCode));
     }
 
 

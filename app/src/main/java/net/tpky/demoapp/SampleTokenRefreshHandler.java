@@ -48,6 +48,10 @@ class SampleTokenRefreshHandler implements TokenRefreshHandler {
          * This sample app does not support multiple Tapkey users, hence the user ID is ignored. It
          * is good practice to check if it matches the user that is expected nonetheless in real
          * applications.
+         * Furthermore, if your application is likely unable to recover from this situation without
+         * running the user through the application's own authentication logic, this is a good place
+         * to force-logout the user, for instance, in this sample:
+         * AuthStateManager.setLoggedOut(this).
          */
         Log.d(TAG, "Refreshing Tapkey authentication failed. Redirecting to login activity.");
         Intent intent = new Intent(context, LoginActivity.class);

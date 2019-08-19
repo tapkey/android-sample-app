@@ -28,16 +28,7 @@ public class App extends Application implements TapkeyAppContext {
          * Application instance's getTapkeyServiceFactory() method.
          */
         TapkeyServiceFactoryBuilder b = new TapkeyServiceFactoryBuilder(this);
-
-        /*
-         * Register token refresh handler.
-         */
         b.setTokenRefreshHandler(new SampleTokenRefreshHandler(this));
-
-        TapkeyEnvironmentConfigBuilder envBuilder = new TapkeyEnvironmentConfigBuilder(this);
-        envBuilder.setBaseUri("https://dev1.dev.tapkey.net");
-        b.setConfig(envBuilder.build());
-
         this.tapkeyServiceFactory = b.build();
 
         /*

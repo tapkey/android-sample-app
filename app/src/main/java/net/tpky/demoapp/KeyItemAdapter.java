@@ -18,12 +18,11 @@ import com.tapkey.mobile.concurrent.CancellationTokenSource;
 import com.tapkey.mobile.concurrent.Promise;
 import com.tapkey.mobile.model.KeyDetails;
 import com.tapkey.mobile.utils.Func1;
+import com.tapkey.mobile.utils.Tuple;
 
 import net.tpky.mc.concurrent.CancellationUtils;
 
-import java.util.Date;
-
-public class KeyItemAdapter extends ArrayAdapter<KeyDetails> {
+public class KeyItemAdapter extends ArrayAdapter<Tuple<KeyDetails, ApplicationGrantDto>> {
 
     private final static String TAG = KeyItemAdapter.class.getSimpleName();
 
@@ -43,32 +42,59 @@ public class KeyItemAdapter extends ArrayAdapter<KeyDetails> {
     @Override
     public View getView(int position, View convertView, ViewGroup parent) {
 
+
         LayoutInflater mInflater = (LayoutInflater) getContext().getSystemService(Activity.LAYOUT_INFLATER_SERVICE);
         final View viewToUse = (convertView == null) ? mInflater.inflate(R.layout.key_item, null) : convertView;
         final TextView lockTitleTextView = viewToUse.findViewById(R.id.key_item__lock_title);
         final TextView issuerTextView = viewToUse.findViewById(R.id.key_item__issuer);
+        final TextView locationTextView = viewToUse.findViewById(R.id.key_item__location);
+        final TextView granteeTextView = viewToUse.findViewById(R.id.key_item__grantee);
         final TextView accessRestrictionTextView = viewToUse.findViewById(R.id.key_item__access_restriction);
         final AppCompatButton triggerButton = viewToUse.findViewById(R.id.key_item__trigger_button);
         final AppCompatButton cancelButton = viewToUse.findViewById(R.id.key_item__cancel_trigger_button);
 
-        final KeyDetails item = getItem(position);
-        lockTitleTextView.setText(getTitle(item));
-        issuerTextView.setText(getContext().getString(R.string.key_item__issued_by, getOwnerName(item)));
+        final Tuple<KeyDetails, ApplicationGrantDto> item = getItem(position);
+        assert item != null;
+        final ApplicationGrantDto grant = item.getValue2();
+        final KeyDetails key = item.getValue1();
+        assert grant != null;
+        assert key != null;
 
-        Date validFrom = (item != null && item.getGrant() != null) ? item.getGrant().getValidFrom() : null;
-        Date validBefore = (item != null && item.getGrant() != null) ? item.getGrant().getValidBefore() : null;
-        boolean icalRestricted = (item != null && item.getGrant() != null) && item.getGrant().getTimeRestrictionIcal() != null;
+        if (grant.getLockTitle() != null) {
+            lockTitleTextView.setText(grant.getLockTitle());
+        } else {
+            lockTitleTextView.setText(getContext().getString(R.string.key_item__unknown_lock));
+        }
 
-        if (validBefore != null || validFrom != null || icalRestricted) {
+        if (grant.getIssuer() != null) {
+            issuerTextView.setText(getContext().getString(R.string.key_item__issued_by, grant.getIssuer()));
+        } else {
+            issuerTextView.setText(getContext().getString(R.string.key_item__unknown_issuer));
+        }
+
+        if (grant.getLockLocation() != null) {
+            locationTextView.setText(getContext().getString(R.string.key_item__location, grant.getLockLocation()));
+        } else {
+            locationTextView.setText(getContext().getString(R.string.key_item__unknown_location));
+        }
+
+        if (grant.getValidFrom() != null || grant.getValidBefore() != null || grant.getTimeRestrictionIcal() != null) {
             accessRestrictionTextView.setText(R.string.key_item__access_restricted);
         } else {
             accessRestrictionTextView.setText(R.string.key_item__access_unrestricted);
         }
 
-        final String physicalLockId = ((item != null) && (item.getGrant() != null) && (item.getGrant().getBoundLock() != null)) ? item.getGrant().getBoundLock().getPhysicalLockId() : null;
+        if (grant.getGranteeFirstName() != null || grant.getGranteeLastName() != null) {
+            granteeTextView.setText(getContext().getString(
+                    R.string.key_item_grantee,
+                    String.format(
+                            "%1$s %2$s",
+                            grant.getGranteeFirstName(),
+                            grant.getGranteeLastName())
+            ));
+        }
 
-
-        if (!handler.isLockNearby(physicalLockId)) {
+        if (!handler.isLockNearby(grant.getPhysicalLockId())) {
             triggerButton.setVisibility(View.GONE);
             cancelButton.setVisibility(View.GONE);
             triggerButton.setOnClickListener(null);
@@ -89,7 +115,7 @@ public class KeyItemAdapter extends ArrayAdapter<KeyDetails> {
                 });
 
                 // asynchronously trigger an unlock command
-                handler.triggerLock(physicalLockId, CancellationUtils.withTimeout(cts.getToken(), 15000))
+                handler.triggerLock(grant.getPhysicalLockId(), CancellationUtils.withTimeout(cts.getToken(), 15000))
 
                         // Catch errors and return false to indicate failure
                         .catchOnUi(e -> {
@@ -100,18 +126,19 @@ public class KeyItemAdapter extends ArrayAdapter<KeyDetails> {
                         // when done, continue on the UI thread
                         .continueOnUi((Func1<Boolean, Void, Exception>) success -> {
 
-                            // when trigger lock was successfully set background color to green
+                            // When trigger lock was successfully set background color to green
                             // otherwise set background color to red
-                            viewToUse.setBackgroundColor((success) ? Color.GREEN : cts.getToken().isCancellationRequested() ? Color.TRANSPARENT : Color.RED);
+                            viewToUse.setBackgroundColor((success) ? getContext().getColor(R.color.success) : cts.getToken().isCancellationRequested() ? Color.TRANSPARENT : getContext().getColor(R.color.error));
 
-                            // enable button to allow another trigger
-                            triggerButton.setEnabled(true);
-                            triggerButton.setVisibility(View.VISIBLE);
+                            // Trigger lock completed, cancelling is not possible anymore.
                             cancelButton.setVisibility(View.GONE);
 
-                            // reset background after a delay
+                            // Reset background after a delay
                             Async.delayAsync(3000).continueOnUi((Func1<Void, Void, Exception>) aVoid -> {
                                 viewToUse.setBackgroundColor(Color.TRANSPARENT);
+                                // enable button to allow another trigger
+                                triggerButton.setEnabled(true);
+                                triggerButton.setVisibility(View.VISIBLE);
                                 return null;
                             });
 
@@ -128,23 +155,5 @@ public class KeyItemAdapter extends ArrayAdapter<KeyDetails> {
         }
 
         return viewToUse;
-    }
-
-    private String getTitle(KeyDetails cachedKeyInformation) {
-
-        if (cachedKeyInformation == null || cachedKeyInformation.getGrant() == null || cachedKeyInformation.getGrant().getBoundLock() == null || cachedKeyInformation.getGrant().getBoundLock().getTitle() == null || cachedKeyInformation.getGrant().getBoundLock().getTitle().isEmpty()) {
-            return getContext().getString(R.string.key_item__unknown_lock);
-        }
-
-        return cachedKeyInformation.getGrant().getBoundLock().getTitle();
-    }
-
-    private String getOwnerName(KeyDetails cachedKeyInformation) {
-        if (cachedKeyInformation == null || cachedKeyInformation.getGrant() == null || cachedKeyInformation.getGrant().getOwner() == null || cachedKeyInformation.getGrant().getOwner().getName() == null || cachedKeyInformation.getGrant().getOwner().getName().isEmpty()) {
-            return getContext().getString(R.string.key_item__unknown_owner);
-        }
-
-
-        return cachedKeyInformation.getGrant().getOwner().getName();
     }
 }

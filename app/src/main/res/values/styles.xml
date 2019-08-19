@@ -8,7 +8,7 @@
         <item name="colorAccent">@color/colorAccent</item>
     </style>
 
-    <style name="Theme.Tapkey.NoActionBar" parent="Theme.MaterialComponents.Light">
+    <style name="Theme.Tapkey.NoActionBar" parent="Theme.MaterialComponents.Light.DarkActionBar">
         <item name="windowActionBar">false</item>
         <item name="windowNoTitle">true</item>
     </style>

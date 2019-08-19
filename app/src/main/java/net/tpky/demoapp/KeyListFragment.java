@@ -23,10 +23,10 @@ import com.tapkey.mobile.manager.CommandExecutionFacade;
 import com.tapkey.mobile.manager.KeyManager;
 import com.tapkey.mobile.manager.UserManager;
 import com.tapkey.mobile.model.KeyDetails;
-import com.tapkey.mobile.utils.Func1;
 import com.tapkey.mobile.utils.ObserverRegistration;
+import com.tapkey.mobile.utils.Tuple;
 
-import java.util.List;
+import java.util.stream.Collectors;
 
 
 public class KeyListFragment extends ListFragment {
@@ -39,8 +39,9 @@ public class KeyListFragment extends ListFragment {
     private UserManager userManager;
     private BleLockScanner bleLockScanner;
     private BleLockCommunicator bleLockCommunicator;
+    private SampleServerManager sampleServerManager;
 
-    private ArrayAdapter<KeyDetails> adapter;
+    private ArrayAdapter<Tuple<KeyDetails, ApplicationGrantDto>> adapter;
 
     private ObserverRegistration bleScanObserverRegistration;
     private ObserverRegistration bleObserverRegistration;
@@ -108,6 +109,7 @@ public class KeyListFragment extends ListFragment {
         userManager = tapkeyServiceFactory.getUserManager();
         bleLockScanner = tapkeyServiceFactory.getBleLockScanner();
         bleLockCommunicator = tapkeyServiceFactory.getBleLockCommunicator();
+        sampleServerManager = new SampleServerManager(getContext());
 
         adapter = new KeyItemAdapter(getActivity(), keyItemAdapterHandler);
 
@@ -232,19 +234,36 @@ public class KeyListFragment extends ListFragment {
 
         String userId = userManager.getUsers().get(0);
 
-        // query for this user's keys asynchronously
+        // Retrieve local mobile keys
         keyManager.queryLocalKeysAsync(userId, forceUpdate, CancellationTokens.None)
 
-                // when completed with success, continue on the UI thread
-                .continueOnUi((Func1<List<KeyDetails>, Void, Exception>) keyDetails -> {
+                // Query sample server for application grant information for the local keys
+                .continueAsyncOnUi(keyDetails -> this.sampleServerManager.getGrants(
+                        AuthStateManager.getUsername(getContext()),
+                        AuthStateManager.getPassword(getContext()),
+                        keyDetails.stream().map((KeyDetails::getGrantId)).toArray(String[]::new)
+                )
+                        // Map the resulting application grant information with the local keys
+                        .continueOnUi(applicationGrants -> keyDetails
+                                .stream()
+                                .map(key -> {
+                                    ApplicationGrantDto grant = applicationGrants
+                                            .stream()
+                                            .filter(x -> x.getId().equals(key.getGrantId()))
+                                            .findAny()
+                                            .orElse(null);
+                                    return new Tuple<>(key, grant);
+                                })
+                                .collect(Collectors.toList())))
 
+                // Add items to the list adapter
+                .continueOnUi(listItems -> {
                     adapter.clear();
-                    adapter.addAll(keyDetails);
-
+                    adapter.addAll(listItems);
                     return null;
                 })
 
-                // handle async exceptions
+                // Handle async exceptions
                 .catchOnUi(e -> {
 
                     Log.e(TAG, "Querying for local keys failed.", e);
@@ -252,7 +271,7 @@ public class KeyListFragment extends ListFragment {
                     return null;
                 })
 
-                // make sure, we don't miss any exceptions.
+                // Ensure no exceptions are missed
                 .conclude();
 
     }

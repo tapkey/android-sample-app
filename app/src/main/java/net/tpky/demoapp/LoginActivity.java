@@ -25,6 +25,8 @@ public class LoginActivity extends AppCompatActivity {
     private Button mButtonCreate;
     private EditText mEditTextEmail;
     private EditText mEditTextPassword;
+    private EditText mEditTextLastName;
+    private EditText mEditTextFirstName;
     private TextView mTextViewErrors;
 
     private SampleServerManager sampleServerManager;
@@ -39,7 +41,10 @@ public class LoginActivity extends AppCompatActivity {
         mButtonCreate = findViewById(R.id.buttonCreateAccount);
         mEditTextEmail = findViewById(R.id.editTextEmail);
         mEditTextPassword = findViewById(R.id.editTextPassword);
+        mEditTextFirstName = findViewById(R.id.editTextFirstName);
+        mEditTextLastName = findViewById(R.id.editTextLastName);
         mTextViewErrors = findViewById(R.id.textViewErrors);
+        mProgressView = findViewById(R.id.progressViewLogin);
 
         App app = (App) getApplication();
         userManager = app.getTapkeyServiceFactory().getUserManager();
@@ -62,11 +67,13 @@ public class LoginActivity extends AppCompatActivity {
     public void onClickCreateAccount(View view) {
         String username = Objects.requireNonNull(mEditTextEmail.getText()).toString();
         String password = Objects.requireNonNull(mEditTextPassword.getText()).toString();
+        String firstName = mEditTextFirstName.getText().toString().trim();
+        String lastName = mEditTextLastName.getText().toString().trim();
 
         mProgressView.setVisibility(View.VISIBLE);
         mButtonCreate.setEnabled(false);
 
-        sampleServerManager.registerUser(username, password)
+        sampleServerManager.registerUser(username, password, firstName, lastName)
                 .continueAsyncOnUi(userId -> {
                     AuthStateManager.setLoggedIn(this, username, password);
                     return sampleServerManager.getExternalToken(username, password);

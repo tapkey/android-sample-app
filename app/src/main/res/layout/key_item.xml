@@ -23,10 +23,15 @@
             tools:text="Test Lock" />
 
         <TextView
+            android:id="@+id/key_item__location"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/key_item__location" />
+
+        <TextView
             android:id="@+id/key_item__issuer"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:paddingEnd="4dp"
             android:text="@string/key_item__issued_by" />
 
         <TextView
@@ -37,19 +42,29 @@
             android:maxLines="1"
             android:text="@string/key_item__access_unrestricted" />
 
+        <TextView
+            android:id="@+id/key_item__grantee"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:ellipsize="end"
+            android:maxLines="1"
+            android:text="@string/key_item_grantee" />
+
     </LinearLayout>
 
     <androidx.appcompat.widget.AppCompatButton
         android:id="@+id/key_item__trigger_button"
         android:layout_width="wrap_content"
-        android:layout_height="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_gravity="center_vertical"
         android:layout_weight="0"
         android:text="@string/key_item__trigger_button_text" />
 
     <androidx.appcompat.widget.AppCompatButton
         android:id="@+id/key_item__cancel_trigger_button"
         android:layout_width="wrap_content"
-        android:layout_height="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_gravity="center_vertical"
         android:layout_weight="0"
         android:text="@string/key_item__cancel_trigger_button_text" />
 
