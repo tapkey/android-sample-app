@@ -14,13 +14,12 @@ import androidx.appcompat.widget.AppCompatButton;
 
 import com.tapkey.mobile.concurrent.Async;
 import com.tapkey.mobile.concurrent.CancellationToken;
+import com.tapkey.mobile.concurrent.CancellationTokens;
 import com.tapkey.mobile.concurrent.CancellationTokenSource;
 import com.tapkey.mobile.concurrent.Promise;
 import com.tapkey.mobile.model.KeyDetails;
 import com.tapkey.mobile.utils.Func1;
 import com.tapkey.mobile.utils.Tuple;
-
-import net.tpky.mc.concurrent.CancellationUtils;
 
 public class KeyItemAdapter extends ArrayAdapter<Tuple<KeyDetails, ApplicationGrantDto>> {
 
@@ -115,7 +114,7 @@ public class KeyItemAdapter extends ArrayAdapter<Tuple<KeyDetails, ApplicationGr
                 });
 
                 // asynchronously trigger an unlock command
-                handler.triggerLock(grant.getPhysicalLockId(), CancellationUtils.withTimeout(cts.getToken(), 15000))
+                handler.triggerLock(grant.getPhysicalLockId(), CancellationTokens.withTimeout(cts.getToken(), 15000))
 
                         // Catch errors and return false to indicate failure
                         .catchOnUi(e -> {
