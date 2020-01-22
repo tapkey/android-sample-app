@@ -235,7 +235,7 @@ public class KeyListFragment extends ListFragment {
         String userId = userManager.getUsers().get(0);
 
         // Retrieve local mobile keys
-        keyManager.queryLocalKeysAsync(userId, forceUpdate, CancellationTokens.None)
+        keyManager.queryLocalKeysAsync(userId, CancellationTokens.None)
 
                 // Query sample server for application grant information for the local keys
                 .continueAsyncOnUi(keyDetails -> this.sampleServerManager.getGrants(
