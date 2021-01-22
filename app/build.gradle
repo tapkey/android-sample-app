@@ -52,7 +52,7 @@ dependencies {
     /*
      * Add Tapkey.MobileLib to dependencies
      */
-    api 'com.tapkey.android:Tapkey.MobileLib:2.7.2.0'
+    api 'com.tapkey.android:Tapkey.MobileLib:2.12.1.0'
 
     implementation fileTree(include: ['*.jar'], dir: 'libs')
     implementation group: 'androidx.appcompat', name: 'appcompat', version: '1.0.2'
