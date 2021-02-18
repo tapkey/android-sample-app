@@ -1,9 +1,8 @@
 <resources>
     <string name="tapkey_authorization_server_scheme" translatable="false">https</string>
-    <string name="tapkey_authorization_server_authority" translatable="false">login-dev1.dev.tapkey.net</string>
-    <string name="tapkey_oauth_client_id" translatable="false">ee93f770cf7d9d9212add237ee01c9e6</string>
-    <string name="tapkey_identity_provider_id" translatable="false">befabf8bd04233338c99caef53903788</string>
-    <string name="sample_backend_scheme" translatable="false">http</string>
-    <!--<string name="sample_backend_authority" translatable="false">token-exchange-server-sample.azurewebsites.net</string>-->
-    <string name="sample_backend_authority" translatable="false">172.17.172.35:8080</string>
+    <string name="tapkey_authorization_server_authority" translatable="false">login.tapkey.com</string>
+    <string name="tapkey_oauth_client_id" translatable="false"></string>
+    <string name="tapkey_identity_provider_id" translatable="false"></string>
+    <string name="sample_backend_scheme" translatable="false">https</string>
+    <string name="sample_backend_authority" translatable="false"></string>
 </resources>

@@ -32,7 +32,7 @@ import java.util.stream.Collectors;
 public class KeyListFragment extends ListFragment {
 
     private final static String TAG = KeyListFragment.class.getSimpleName();
-    private static final int PERMISSIONS_REQUEST__ACCESS_COARSE_LOCATION = 0;
+    private static final int PERMISSIONS_REQUEST__ACCESS_FINE_LOCATION = 0;
 
     private KeyManager keyManager;
     private CommandExecutionFacade commandExecutionFacade;
@@ -115,13 +115,13 @@ public class KeyListFragment extends ListFragment {
 
         setListAdapter(adapter);
 
-        // make sure, we have the ACCESS_COARSE_LOCATION permission, which is required, to detect
+        // make sure, we have the ACCESS_FINE_LOCATION permission, which is required, to detect
         // BLE locks nearby.
-        if (ContextCompat.checkSelfPermission(getContext(), android.Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+        if (ContextCompat.checkSelfPermission(getContext(), android.Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
 
             // Should we explain to the user, why we need this permission before actually requesting
             // it? This is the case, if the user rejected the permission before.
-            if (shouldShowRequestPermissionRationale(android.Manifest.permission.ACCESS_COARSE_LOCATION)) {
+            if (shouldShowRequestPermissionRationale(android.Manifest.permission.ACCESS_FINE_LOCATION)) {
                 showPermissionRationale();
             } else {
                 requestPermission();
@@ -145,9 +145,9 @@ public class KeyListFragment extends ListFragment {
             bleObserverRegistration = bleLockScanner.getLocksChangedObservable().addObserver(stringBleLockMap -> adapter.notifyDataSetChanged());
         }
 
-        if (ContextCompat.checkSelfPermission(getContext(), android.Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED) {
+        if (ContextCompat.checkSelfPermission(getContext(), android.Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED) {
             try {
-                // If we have the COARSE_LOCATION permission, start scanning for BLE devices
+                // If we have the ACCESS_FINE_LOCATION permission, start scanning for BLE devices
                 if (bleScanObserverRegistration == null) {
                     bleScanObserverRegistration = bleLockScanner.startForegroundScan();
                 }
@@ -155,7 +155,7 @@ public class KeyListFragment extends ListFragment {
                 Log.i(TAG, "Couldn't start scanning for nearby BLE locks.", e);
             }
         } else {
-            if (shouldShowRequestPermissionRationale(android.Manifest.permission.ACCESS_COARSE_LOCATION)) {
+            if (shouldShowRequestPermissionRationale(android.Manifest.permission.ACCESS_FINE_LOCATION)) {
                 showPermissionRationale();
             }
         }
@@ -187,7 +187,7 @@ public class KeyListFragment extends ListFragment {
     @Override
     public void onRequestPermissionsResult(int requestCode, String permissions[], int[] grantResults) {
         switch (requestCode) {
-            case PERMISSIONS_REQUEST__ACCESS_COARSE_LOCATION: {
+            case PERMISSIONS_REQUEST__ACCESS_FINE_LOCATION: {
                 // If request is cancelled, the result arrays are empty.
                 if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
                     if (bleScanObserverRegistration == null) {
@@ -195,7 +195,7 @@ public class KeyListFragment extends ListFragment {
                     }
                 } else {
 
-                    if (shouldShowRequestPermissionRationale(android.Manifest.permission.ACCESS_COARSE_LOCATION)) {
+                    if (shouldShowRequestPermissionRationale(android.Manifest.permission.ACCESS_FINE_LOCATION)) {
                         showPermissionRationale();
                     } else {
 
@@ -222,7 +222,7 @@ public class KeyListFragment extends ListFragment {
     }
 
     private void requestPermission() {
-        requestPermissions(new String[]{android.Manifest.permission.ACCESS_COARSE_LOCATION}, PERMISSIONS_REQUEST__ACCESS_COARSE_LOCATION);
+        requestPermissions(new String[]{android.Manifest.permission.ACCESS_FINE_LOCATION}, PERMISSIONS_REQUEST__ACCESS_FINE_LOCATION);
     }
 
     private void onKeyUpdate(boolean forceUpdate) {
