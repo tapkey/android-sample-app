@@ -63,7 +63,12 @@ public class KeyListFragment extends ListFragment {
 
     static {
 
-        if (Build.VERSION.SDK_INT >= 29) {
+        if (Build.VERSION.SDK_INT >= 31) {
+            REQUIRED_PERMISSIONS = new String[] { Manifest.permission.BLUETOOTH_SCAN, Manifest.permission.BLUETOOTH_CONNECT };
+            PERMISSION_RATIONALE_STRING_ID = R.string.key_item__permission_needed__ble_scan_connect;
+        }
+
+        else if (Build.VERSION.SDK_INT >= 29) {
             REQUIRED_PERMISSIONS = new String[] { Manifest.permission.ACCESS_FINE_LOCATION };
             PERMISSION_RATIONALE_STRING_ID = R.string.key_item__permission_needed__fine_location;
         }
