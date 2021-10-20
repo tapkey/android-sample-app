@@ -1,14 +1,21 @@
 package net.tpky.demoapp;
 
+import android.Manifest;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.net.Uri;
+import android.os.Build;
 import android.os.Bundle;
 import android.provider.Settings;
 import android.util.Log;
+import android.view.View;
 import android.widget.ArrayAdapter;
 import android.widget.Toast;
 
+import androidx.activity.result.ActivityResultLauncher;
+import androidx.activity.result.contract.ActivityResultContracts;
+import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
 import androidx.core.content.ContextCompat;
 import androidx.fragment.app.ListFragment;
 
@@ -35,7 +42,6 @@ import java.util.stream.Collectors;
 public class KeyListFragment extends ListFragment {
 
     private final static String TAG = KeyListFragment.class.getSimpleName();
-    private static final int PERMISSIONS_REQUEST__ACCESS_FINE_LOCATION = 0;
 
     private KeyManager keyManager;
     private CommandExecutionFacade commandExecutionFacade;
@@ -44,11 +50,37 @@ public class KeyListFragment extends ListFragment {
     private BleLockCommunicator bleLockCommunicator;
     private SampleServerManager sampleServerManager;
 
+    private ActivityResultLauncher<String[]> requestPermissionLauncher;
+
     private ArrayAdapter<Tuple<KeyDetails, ApplicationGrantDto>> adapter;
 
     private ObserverRegistration bleScanObserverRegistration;
     private ObserverRegistration bleObserverRegistration;
     private ObserverRegistration keyUpdateObserverRegistration;
+
+    private static final String[] REQUIRED_PERMISSIONS;
+    private static final Integer PERMISSION_RATIONALE_STRING_ID;
+
+    static {
+
+        if (Build.VERSION.SDK_INT >= 31) {
+            REQUIRED_PERMISSIONS = new String[] { Manifest.permission.BLUETOOTH_SCAN, Manifest.permission.BLUETOOTH_CONNECT };
+            PERMISSION_RATIONALE_STRING_ID = R.string.key_item__permission_needed__ble_scan_connect;
+        }
+
+        else if (Build.VERSION.SDK_INT >= 29) {
+            REQUIRED_PERMISSIONS = new String[] { Manifest.permission.ACCESS_FINE_LOCATION };
+            PERMISSION_RATIONALE_STRING_ID = R.string.key_item__permission_needed__fine_location;
+        }
+        else if (Build.VERSION.SDK_INT >= 23) {
+            REQUIRED_PERMISSIONS =  new String[] { Manifest.permission.ACCESS_COARSE_LOCATION };
+            PERMISSION_RATIONALE_STRING_ID = R.string.key_item__permission_needed__coarse_location;
+        } else
+        {
+            REQUIRED_PERMISSIONS = new String[0];
+            PERMISSION_RATIONALE_STRING_ID = null;
+        }
+    }
 
     // the handler that connects the individual items of the key ring (i.e. individual keys) to the
     // functional components.
@@ -109,8 +141,8 @@ public class KeyListFragment extends ListFragment {
     };
 
     @Override
-    public void onActivityCreated(Bundle savedInstanceState) {
-        super.onActivityCreated(savedInstanceState);
+    public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
+        super.onViewCreated(view, savedInstanceState);
 
         App app = (App) getActivity().getApplication();
         TapkeyServiceFactory tapkeyServiceFactory = app.getTapkeyServiceFactory();
@@ -125,18 +157,52 @@ public class KeyListFragment extends ListFragment {
 
         setListAdapter(adapter);
 
-        // make sure, we have the ACCESS_FINE_LOCATION permission, which is required, to detect
-        // BLE locks nearby.
-        if (ContextCompat.checkSelfPermission(getContext(), android.Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+        requestPermissionLauncher = registerForActivityResult(new ActivityResultContracts.RequestMultiplePermissions(), result -> {
+
+            boolean showRationale = false;
+            boolean blocked = false;
+
+            for (String permission : result.keySet()) {
+
+                Boolean granted = result.get(permission);
+
+                if (granted)
+                    continue;
+
+                boolean shouldShowRationale = shouldShowRequestPermissionRationale(permission);
+                showRationale = showRationale || shouldShowRationale;
+                blocked = blocked || !shouldShowRationale;
+            }
+
+            if (blocked) {
+                Snackbar.make(getView(), PERMISSION_RATIONALE_STRING_ID, Snackbar.LENGTH_INDEFINITE)
+                        .setAction("ALLOW", x -> {
+
+                            Intent intent = new Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.fromParts("package", getActivity().getPackageName(), null));
+                            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                            startActivity(intent);
+
+                        }).show();
+            } else if (showRationale) {
+                showPermissionRationale();
+            } else {
+                if (bleScanObserverRegistration == null) {
+                    bleScanObserverRegistration = bleLockScanner.startForegroundScan();
+                }
+            }
+        });
+
+        if (!checkPermissions()) {
 
             // Should we explain to the user, why we need this permission before actually requesting
             // it? This is the case, if the user rejected the permission before.
-            if (shouldShowRequestPermissionRationale(android.Manifest.permission.ACCESS_FINE_LOCATION)) {
+            if (shouldShowRationale()) {
                 showPermissionRationale();
             } else {
-                requestPermission();
+                requestPermissions();
             }
         }
+
     }
 
     @Override
@@ -155,9 +221,9 @@ public class KeyListFragment extends ListFragment {
             bleObserverRegistration = bleLockScanner.getLocksChangedObservable().addObserver(stringBleLockMap -> adapter.notifyDataSetChanged());
         }
 
-        if (ContextCompat.checkSelfPermission(getContext(), android.Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED) {
+        if (checkPermissions()) {
             try {
-                // If we have the ACCESS_FINE_LOCATION permission, start scanning for BLE devices
+                // If we have the required permissions, start scanning for BLE devices
                 if (bleScanObserverRegistration == null) {
                     bleScanObserverRegistration = bleLockScanner.startForegroundScan();
                 }
@@ -165,7 +231,7 @@ public class KeyListFragment extends ListFragment {
                 Log.i(TAG, "Couldn't start scanning for nearby BLE locks.", e);
             }
         } else {
-            if (shouldShowRequestPermissionRationale(android.Manifest.permission.ACCESS_FINE_LOCATION)) {
+            if (shouldShowRationale()) {
                 showPermissionRationale();
             }
         }
@@ -194,45 +260,14 @@ public class KeyListFragment extends ListFragment {
         }
     }
 
-    @Override
-    public void onRequestPermissionsResult(int requestCode, String permissions[], int[] grantResults) {
-        switch (requestCode) {
-            case PERMISSIONS_REQUEST__ACCESS_FINE_LOCATION: {
-                // If request is cancelled, the result arrays are empty.
-                if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
-                    if (bleScanObserverRegistration == null) {
-                        bleScanObserverRegistration = bleLockScanner.startForegroundScan();
-                    }
-                } else {
-
-                    if (shouldShowRequestPermissionRationale(android.Manifest.permission.ACCESS_FINE_LOCATION)) {
-                        showPermissionRationale();
-                    } else {
-
-                        Snackbar.make(getView(), R.string.key_item__permission_needed, Snackbar.LENGTH_INDEFINITE)
-                                .setAction("ALLOW", view -> {
-
-                                    Intent intent = new Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.fromParts("package", getActivity().getPackageName(), null));
-                                    intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-                                    startActivity(intent);
-
-                                }).show();
-
-                    }
-                }
-            }
-
-        }
-    }
-
     private void showPermissionRationale() {
-
-        Snackbar.make(getView(), R.string.key_item__permission_needed, Snackbar.LENGTH_INDEFINITE)
-                .setAction("ALLOW", view -> requestPermission()).show();
+        Snackbar.make(getView(), PERMISSION_RATIONALE_STRING_ID, Snackbar.LENGTH_INDEFINITE)
+                .setAction("ALLOW", view -> requestPermissions()).show();
     }
 
-    private void requestPermission() {
-        requestPermissions(new String[]{android.Manifest.permission.ACCESS_FINE_LOCATION}, PERMISSIONS_REQUEST__ACCESS_FINE_LOCATION);
+    private void requestPermissions() {
+        requestPermissionLauncher
+            .launch(REQUIRED_PERMISSIONS);
     }
 
     private void onKeyUpdate(boolean forceUpdate) {
@@ -284,5 +319,27 @@ public class KeyListFragment extends ListFragment {
                 // Ensure no exceptions are missed
                 .conclude();
 
+    }
+
+    private boolean shouldShowRationale() {
+        for (String permission : REQUIRED_PERMISSIONS) {
+
+            if(shouldShowRequestPermissionRationale(permission))
+                return true;
+        }
+        return false;
+    }
+
+    private boolean checkPermissions() {
+
+        for (String permission : REQUIRED_PERMISSIONS) {
+            int permissionResult = ContextCompat.checkSelfPermission(getContext(), permission);
+
+            if(permissionResult == PackageManager.PERMISSION_GRANTED)
+                continue;
+
+            return false;
+        }
+        return true;
     }
 }

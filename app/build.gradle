@@ -12,12 +12,11 @@ repositories {
 }
 
 android {
-    compileSdkVersion 30
-    buildToolsVersion = "30.0.3"
+    compileSdkVersion 31
     defaultConfig {
         applicationId "net.tpky.demoapp"
         minSdkVersion 26
-        targetSdkVersion 30
+        targetSdkVersion 31
         versionCode 1
         versionName "1.0"
         vectorDrawables {
@@ -52,11 +51,11 @@ dependencies {
     /*
      * Add Tapkey.MobileLib to dependencies
      */
-    api 'com.tapkey.android:Tapkey.MobileLib:2.15.3.0'
+    api 'com.tapkey.android:Tapkey.MobileLib:2.18.0.1'
 
     implementation fileTree(include: ['*.jar'], dir: 'libs')
-    implementation group: 'androidx.appcompat', name: 'appcompat', version: '1.0.2'
+    implementation group: 'androidx.appcompat', name: 'appcompat', version: '1.3.1'
     implementation 'com.google.android.material:material:1.1.0-alpha09'
-    implementation 'com.android.volley:volley:1.1.1'
+    implementation 'com.android.volley:volley:1.2.1'
     implementation 'net.openid:appauth:0.7.1'
 }
