@@ -24,7 +24,8 @@
     <string name="key_item__access_restricted">Restricted access</string>
     <string name="key_item__access_unrestricted">Unrestricted access</string>
     <string name="key_item__issued_by">Issued by %1$s</string>
-    <string name="key_item__permission_needed">Permission Fine location needed</string>
+    <string name="key_item__permission_needed__fine_location">Permission Fine location needed</string>
+    <string name="key_item__permission_needed__coarse_location">Permission Coarse location needed</string>
     <string name="key_item__trigger_lock_failed">Something went wrong.</string>
     <string name="bluetooth_and_location_inf_header">Bluetooth and location</string>
     <string name="bluetooth_and_location_inf_message">Bluetooth and location must be enabled.</string>
