@@ -3,7 +3,6 @@ package net.tpky.demoapp;
 import android.app.Application;
 
 import com.tapkey.mobile.TapkeyAppContext;
-import com.tapkey.mobile.TapkeyEnvironmentConfigBuilder;
 import com.tapkey.mobile.TapkeyServiceFactory;
 import com.tapkey.mobile.TapkeyServiceFactoryBuilder;
 import com.tapkey.mobile.broadcast.PollingScheduler;

@@ -23,8 +23,11 @@ import com.tapkey.mobile.manager.CommandExecutionFacade;
 import com.tapkey.mobile.manager.KeyManager;
 import com.tapkey.mobile.manager.UserManager;
 import com.tapkey.mobile.model.KeyDetails;
+import com.tapkey.mobile.tlcp.commands.DefaultTriggerLockCommandBuilder;
 import com.tapkey.mobile.utils.ObserverRegistration;
 import com.tapkey.mobile.utils.Tuple;
+
+import net.tpky.mc.tlcp.model.TriggerLockCommand;
 
 import java.util.stream.Collectors;
 
@@ -67,7 +70,14 @@ public class KeyListFragment extends ListFragment {
 
                 // now, that we have a TlcpConnection to the lock, let the CommandExecutionFacade
                 // asynchronously execute the trigger lock command.
-                return commandExecutionFacade.triggerLockAsync(tlcpConnection, ct);
+
+                TriggerLockCommand triggerLockCommand = new DefaultTriggerLockCommandBuilder()
+                        .build();
+
+                return commandExecutionFacade.executeStandardCommandAsync(
+                        tlcpConnection,
+                        triggerLockCommand,
+                        ct);
 
             }, ct).continueOnUi(commandResult -> {
 
